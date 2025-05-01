@@ -16,7 +16,6 @@ use super::charstring::CharStringParser;
 use super::dict::DictionaryParser;
 use super::encoding::{parse_encoding, Encoding, STANDARD_ENCODING};
 use super::index::{parse_index, skip_index, Index};
-#[cfg(feature = "glyph-names")]
 use super::std_names::STANDARD_NAMES;
 use super::{calc_subroutine_bias, conv_subroutine_index, Builder, CFFError, IsEven, StringId};
 use crate::parser::{LazyArray16, NumFrom, Stream, TryNumFrom};
@@ -211,7 +210,6 @@ fn parse_top_dict(s: &mut Stream) -> Option<TopDict> {
     Some(top_dict)
 }
 
-// TODO: move to integration
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1001,7 +999,6 @@ impl<'a> Table<'a> {
     }
 
     /// Returns a glyph ID by a name.
-    #[cfg(feature = "glyph-names")]
     pub fn glyph_index_by_name(&self, name: &str) -> Option<GlyphId> {
         match self.kind {
             FontKind::SID(_) => {
@@ -1022,7 +1019,6 @@ impl<'a> Table<'a> {
     }
 
     /// Returns a glyph name.
-    #[cfg(feature = "glyph-names")]
     pub fn glyph_name(&self, glyph_id: GlyphId) -> Option<&'a str> {
         match self.kind {
             FontKind::SID(_) => {
@@ -1044,7 +1040,6 @@ impl<'a> Table<'a> {
     /// Returns the CID corresponding to a glyph ID.
     ///
     /// Returns `None` if this is not a CIDFont.
-    #[cfg(feature = "glyph-names")]
     pub fn glyph_cid(&self, glyph_id: GlyphId) -> Option<u16> {
         match self.kind {
             FontKind::SID(_) => None,

@@ -4,7 +4,6 @@
 //! some tables manually.
 
 use core::convert::{TryFrom, TryInto};
-use core::ops::Range;
 
 /// A trait for parsing raw binary data of fixed size.
 ///
@@ -117,33 +116,6 @@ impl FromData for U24 {
     }
 }
 
-/// A 16-bit signed fixed number with the low 14 bits of fraction (2.14).
-#[derive(Clone, Copy, Debug)]
-pub struct F2DOT14(pub i16);
-
-impl F2DOT14 {
-    /// Converts i16 to f32.
-    #[inline]
-    pub fn to_f32(self) -> f32 {
-        f32::from(self.0) / 16384.0
-    }
-
-    #[cfg(feature = "variable-fonts")]
-    #[inline]
-    pub fn apply_float_delta(&self, delta: f32) -> f32 {
-        self.to_f32() + (delta as f64 * (1.0 / 16384.0)) as f32
-    }
-}
-
-impl FromData for F2DOT14 {
-    const SIZE: usize = 2;
-
-    #[inline]
-    fn parse(data: &[u8]) -> Option<Self> {
-        i16::parse(data).map(F2DOT14)
-    }
-}
-
 /// A 32-bit signed fixed-point number (16.16).
 #[derive(Clone, Copy, Debug)]
 pub struct Fixed(pub f32);
@@ -155,14 +127,6 @@ impl FromData for Fixed {
     fn parse(data: &[u8]) -> Option<Self> {
         // TODO: is it safe to cast?
         i32::parse(data).map(|n| Fixed(n as f32 / 65536.0))
-    }
-}
-
-impl Fixed {
-    #[cfg(feature = "variable-fonts")]
-    #[inline]
-    pub(crate) fn apply_float_delta(&self, delta: f32) -> f32 {
-        self.0 + (delta as f64 * (1.0 / 65536.0)) as f32
     }
 }
 
@@ -291,27 +255,6 @@ impl<'a, T: FromData> LazyArray16<'a, T> {
         }
     }
 
-    /// Returns the last value.
-    #[inline]
-    pub fn last(&self) -> Option<T> {
-        if !self.is_empty() {
-            self.get(self.len() - 1)
-        } else {
-            None
-        }
-    }
-
-    /// Returns sub-array.
-    #[inline]
-    pub fn slice(&self, range: Range<u16>) -> Option<Self> {
-        let start = usize::from(range.start) * T::SIZE;
-        let end = usize::from(range.end) * T::SIZE;
-        Some(LazyArray16 {
-            data: self.data.get(start..end)?,
-            ..LazyArray16::default()
-        })
-    }
-
     /// Returns array's length.
     #[inline]
     pub fn len(&self) -> u16 {
@@ -322,51 +265,6 @@ impl<'a, T: FromData> LazyArray16<'a, T> {
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
-    }
-
-    /// Performs a binary search by specified `key`.
-    #[inline]
-    pub fn binary_search(&self, key: &T) -> Option<(u16, T)>
-    where
-        T: Ord,
-    {
-        self.binary_search_by(|p| p.cmp(key))
-    }
-
-    /// Performs a binary search using specified closure.
-    #[inline]
-    pub fn binary_search_by<F>(&self, mut f: F) -> Option<(u16, T)>
-    where
-        F: FnMut(&T) -> core::cmp::Ordering,
-    {
-        // Based on Rust std implementation.
-
-        use core::cmp::Ordering;
-
-        let mut size = self.len();
-        if size == 0 {
-            return None;
-        }
-
-        let mut base = 0;
-        while size > 1 {
-            let half = size / 2;
-            let mid = base + half;
-            // mid is always in [0, size), that means mid is >= 0 and < size.
-            // mid >= 0: by definition
-            // mid < size: mid = size / 2 + size / 4 + size / 8 ...
-            let cmp = f(&self.get(mid)?);
-            base = if cmp == Ordering::Greater { base } else { mid };
-            size -= half;
-        }
-
-        // base is always in [0, size) because base <= mid.
-        let value = self.get(base)?;
-        if f(&value) == Ordering::Equal {
-            Some((base, value))
-        } else {
-            None
-        }
     }
 }
 
@@ -442,15 +340,6 @@ impl<T> Default for LazyArray32<'_, T> {
 }
 
 impl<'a, T: FromData> LazyArray32<'a, T> {
-    /// Creates a new `LazyArray`.
-    #[inline]
-    pub fn new(data: &'a [u8]) -> Self {
-        LazyArray32 {
-            data,
-            data_type: core::marker::PhantomData,
-        }
-    }
-
     /// Returns a value at `index`.
     #[inline]
     pub fn get(&self, index: u32) -> Option<T> {
@@ -467,56 +356,6 @@ impl<'a, T: FromData> LazyArray32<'a, T> {
     #[inline]
     pub fn len(&self) -> u32 {
         (self.data.len() / T::SIZE) as u32
-    }
-
-    /// Checks if the array is empty.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// Performs a binary search by specified `key`.
-    #[inline]
-    pub fn binary_search(&self, key: &T) -> Option<(u32, T)>
-    where
-        T: Ord,
-    {
-        self.binary_search_by(|p| p.cmp(key))
-    }
-
-    /// Performs a binary search using specified closure.
-    #[inline]
-    pub fn binary_search_by<F>(&self, mut f: F) -> Option<(u32, T)>
-    where
-        F: FnMut(&T) -> core::cmp::Ordering,
-    {
-        // Based on Rust std implementation.
-
-        use core::cmp::Ordering;
-
-        let mut size = self.len();
-        if size == 0 {
-            return None;
-        }
-
-        let mut base = 0;
-        while size > 1 {
-            let half = size / 2;
-            let mid = base + half;
-            // mid is always in [0, size), that means mid is >= 0 and < size.
-            // mid >= 0: by definition
-            // mid < size: mid = size / 2 + size / 4 + size / 8 ...
-            let cmp = f(&self.get(mid)?);
-            base = if cmp == Ordering::Greater { base } else { mid };
-            size -= half;
-        }
-
-        // base is always in [0, size) because base <= mid.
-        let value = self.get(base)?;
-        if f(&value) == Ordering::Equal {
-            Some((base, value))
-        } else {
-            None
-        }
     }
 }
 
@@ -697,14 +536,6 @@ impl<'a> Stream<'a> {
         self.offset >= self.data.len()
     }
 
-    /// Jumps to the end of the stream.
-    ///
-    /// Useful to indicate that we parsed all the data.
-    #[inline]
-    pub fn jump_to_end(&mut self) {
-        self.offset = self.data.len();
-    }
-
     /// Returns the current offset.
     #[inline]
     pub fn offset(&self) -> usize {
@@ -735,17 +566,6 @@ impl<'a> Stream<'a> {
         self.offset += len;
     }
 
-    /// Advances by the specified `len` and checks for bounds.
-    #[inline]
-    pub fn advance_checked(&mut self, len: usize) -> Option<()> {
-        if self.offset + len <= self.data.len() {
-            self.advance(len);
-            Some(())
-        } else {
-            None
-        }
-    }
-
     /// Parses the type from the steam.
     ///
     /// Returns `None` when there is not enough data left in the stream
@@ -753,12 +573,6 @@ impl<'a> Stream<'a> {
     #[inline]
     pub fn read<T: FromData>(&mut self) -> Option<T> {
         self.read_bytes(T::SIZE).and_then(T::parse)
-    }
-
-    /// Parses the type from the steam at offset.
-    #[inline]
-    pub fn read_at<T: FromData>(data: &[u8], offset: usize) -> Option<T> {
-        data.get(offset..offset + T::SIZE).and_then(T::parse)
     }
 
     /// Reads N bytes from the stream.
@@ -779,13 +593,6 @@ impl<'a> Stream<'a> {
     pub fn read_array16<T: FromData>(&mut self, count: u16) -> Option<LazyArray16<'a, T>> {
         let len = usize::from(count) * T::SIZE;
         self.read_bytes(len).map(LazyArray16::new)
-    }
-
-    /// Reads the next `count` types as a slice.
-    #[inline]
-    pub fn read_array32<T: FromData>(&mut self, count: u32) -> Option<LazyArray32<'a, T>> {
-        let len = usize::num_from(count) * T::SIZE;
-        self.read_bytes(len).map(LazyArray32::new)
     }
 
     #[allow(dead_code)]
@@ -902,25 +709,4 @@ impl FromData for Option<Offset32> {
             Some(None)
         }
     }
-}
-
-#[inline]
-pub fn i16_bound(min: i16, val: i16, max: i16) -> i16 {
-    use core::cmp;
-    cmp::max(min, cmp::min(max, val))
-}
-
-#[inline]
-pub fn f32_bound(min: f32, val: f32, max: f32) -> f32 {
-    debug_assert!(min.is_finite());
-    debug_assert!(val.is_finite());
-    debug_assert!(max.is_finite());
-
-    if val > max {
-        return max;
-    } else if val < min {
-        return min;
-    }
-
-    val
 }

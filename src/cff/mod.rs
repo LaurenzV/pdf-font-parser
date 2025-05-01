@@ -1,13 +1,10 @@
 mod argstack;
-pub mod cff1;
-#[cfg(feature = "variable-fonts")]
-pub mod cff2;
+pub mod cff;
 mod charset;
 mod charstring;
 mod dict;
 mod encoding;
 mod index;
-#[cfg(feature = "glyph-names")]
 mod std_names;
 
 use core::convert::TryFrom;
@@ -34,12 +31,6 @@ pub enum CFFError {
     InvalidSubroutineIndex,
     NoLocalSubroutines,
     InvalidSeacCode,
-    #[cfg(feature = "variable-fonts")]
-    InvalidItemVariationDataIndex,
-    #[cfg(feature = "variable-fonts")]
-    InvalidNumberOfBlendOperands,
-    #[cfg(feature = "variable-fonts")]
-    BlendRegionsLimitReached,
 }
 
 pub(crate) struct Builder<'a> {
@@ -104,20 +95,8 @@ impl IsEven for usize {
     }
 }
 
-#[cfg(feature = "std")]
-#[inline]
 pub fn f32_abs(n: f32) -> f32 {
     n.abs()
-}
-
-#[cfg(not(feature = "std"))]
-#[inline]
-pub fn f32_abs(n: f32) -> f32 {
-    if n.is_sign_negative() {
-        -n
-    } else {
-        n
-    }
 }
 
 #[inline]
