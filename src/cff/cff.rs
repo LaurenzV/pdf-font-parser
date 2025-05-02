@@ -32,6 +32,7 @@ const TWO_BYTE_OPERATOR_MARK: u8 = 12;
 
 /// Enumerates some operators defined in the Adobe Technical Note #5177.
 mod operator {
+    pub const DOTSECTION: u8 = 0;
     pub const HORIZONTAL_STEM: u8 = 1;
     pub const VERTICAL_STEM: u8 = 3;
     pub const VERTICAL_MOVE_TO: u8 = 4;
@@ -520,6 +521,7 @@ fn _parse_char_string(
                     operator::FLEX => p.parse_flex()?,
                     operator::HFLEX1 => p.parse_hflex1()?,
                     operator::FLEX1 => p.parse_flex1()?,
+                    operator::DOTSECTION => {},
                     _ => return Err(CFFError::UnsupportedOperator),
                 }
             }
