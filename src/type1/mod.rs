@@ -72,7 +72,7 @@ impl<'a> Table<'a> {
 
     fn parse_eexec(data: &[u8], params: &mut Parameters) {
         let mut s = Stream::new(data);
-        
+
         let mut lenIv = 4;
 
         while let Some(token) = s.next_token() {
@@ -138,23 +138,9 @@ impl<'a> Stream<'a> {
 
             self.skip_whitespaces();
 
-            let mut r = 4330;
-            
             // TODO: Decrypt
-            let temp = self.read_bytes(bin_len as usize).unwrap();
-            let mut cb: Copied<Iter<u8>> = temp.iter().copied();
-            let mut decrypted = vec![];
-            
-            for i in 0..len_iv {
-                let _ = decrypt_byte(cb.next().unwrap(), &mut r);
-            }
-            
-            for byte in cb {
-                decrypted.push(decrypt_byte(byte, &mut r))
-            }
-            
-            
-            subroutines.push(decrypted);
+            let encrypted_bytes = self.read_bytes(bin_len as usize).unwrap();
+            subroutines.push(decrypt_charstring(encrypted_bytes, len_iv));
 
             let mut tok = self.next_token().unwrap();
             if tok == b"NP" || tok == b"|" {
@@ -384,6 +370,22 @@ impl<'a> Stream<'a> {
 
         false
     }
+}
+
+fn decrypt_charstring(data: &[u8], len_iv: usize) -> Vec<u8> {
+    let mut r = 4330;
+    let mut cb: Copied<Iter<u8>> = data.iter().copied();
+    let mut decrypted = vec![];
+
+    for i in 0..len_iv {
+        let _ = decrypt_byte(cb.next().unwrap(), &mut r);
+    }
+
+    for byte in cb {
+        decrypted.push(decrypt_byte(byte, &mut r))
+    }
+
+    decrypted
 }
 
 fn is_whitespace(c: u8) -> bool {

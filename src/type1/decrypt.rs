@@ -7,9 +7,7 @@ pub(crate) fn decrypt(data: &[u8]) -> Vec<u8> {
     let mut b00 = None;
     let mut r: u32 = 55665;
 
-    let mut decrypt = |b: u8| {
-        decrypt_byte(b, &mut r)
-    };
+    let mut decrypt = |b: u8| decrypt_byte(b, &mut r);
 
     for i in 0..1000 {
         let c = stream.read_byte().unwrap();
