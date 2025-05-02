@@ -16,6 +16,7 @@ struct Parameters {
     font_matrix: Option<[f32; 6]>,
     encoding_type: EncodingType,
     subroutines: Vec<Vec<u8>>,
+    charstrings: Vec<Vec<u8>>,
 }
 
 impl Default for Parameters {
@@ -24,6 +25,7 @@ impl Default for Parameters {
             font_matrix: None,
             encoding_type: EncodingType::Standard,
             subroutines: vec![],
+            charstrings: vec![],
         }
     }
 }
@@ -80,6 +82,9 @@ impl<'a> Table<'a> {
                 b"/Subrs" => {
                     params.subroutines = s.parse_subroutines(lenIv);
                 }
+                b"/CharStrings" => {
+                    params.charstrings = s.parse_charstrings(lenIv).unwrap();
+                }
                 b"/lenIV" => {
                     lenIv = s.next_int() as usize;
                 }
@@ -103,6 +108,79 @@ impl<'a> Stream<'a> {
         i32::from_str(std::str::from_utf8(self.next_token().unwrap()).unwrap()).unwrap()
     }
 
+    fn parse_charstrings(&mut self, len_iv: usize) -> Option<Vec<Vec<u8>>> {
+        let mut charstrings = vec![];
+        
+        let mut first_glyph_name = None;
+        let mut int_token = None;
+        
+        while let Some(token) = self.next_token() {
+            if token == b"end" {
+                return Some(charstrings);
+            }
+            
+            if token.starts_with(b"/") {
+                first_glyph_name = Some(token);
+            }   else if token.iter().all(|b| matches!(*b, b'#') || b.is_ascii_digit()) {
+                int_token = Some(i32::from_str(std::str::from_utf8(token).unwrap()).unwrap());
+            }   else if token == RD || token == RD_ALT {
+                break;
+            }
+        }
+        
+        let (first_glyph_name, int_token) = (first_glyph_name.unwrap(), int_token.unwrap());
+        
+        let mut is_first = true;
+        
+        loop {
+            let mut bin_len;
+            let mut glyph_name;
+            
+            if is_first {
+                is_first = false;
+                bin_len = int_token;
+                glyph_name = first_glyph_name;
+                
+                if glyph_name.starts_with(b"/") {
+                    glyph_name = &glyph_name[1..];
+                }
+            }   else {
+                let tok = self.next_token().unwrap();
+                if tok == b"end" {
+                    break;
+                }
+                
+                if tok.starts_with(b"/") {
+                    glyph_name = &tok[1..];
+                }
+                
+                bin_len = self.next_int();
+                let tok = self.next_token().unwrap();
+                
+                if tok == RD || tok == RD_ALT {
+                    
+                }   else {
+                    panic!("invalid charstring in start, expected RD");
+                }
+            }
+
+            self.skip_whitespaces();
+
+            // TODO: Decrypt
+            let encrypted_bytes = self.read_bytes(bin_len as usize).unwrap();
+            charstrings.push(decrypt_charstring(encrypted_bytes, len_iv));
+            
+            let tok = self.next_token().unwrap();
+            if tok == ND || tok == ND_ALT {
+                
+            }   else {
+                panic!("invalid charstring in end, expected ND");
+            }
+        }
+        
+        Some(charstrings)
+    }
+    
     fn parse_subroutines(&mut self, len_iv: usize) -> Vec<Vec<u8>> {
         let mut subroutines = Vec::new();
 
@@ -393,7 +471,7 @@ fn decrypt_charstring(data: &[u8], len_iv: usize) -> Vec<u8> {
     for byte in cb {
         decrypted.push(decrypt_byte(byte, &mut r))
     }
-
+    
     decrypted
 }
 
