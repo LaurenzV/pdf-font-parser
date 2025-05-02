@@ -1,6 +1,7 @@
 mod decrypt;
 
 use std::collections::HashMap;
+use std::path::Component::ParentDir;
 use std::str::FromStr;
 use log::error;
 use crate::parser::Stream;
@@ -20,7 +21,7 @@ impl<'a> Table<'a> {
             
             return None;
         }
-
+        
         let mut s = Stream::new(data);
         
         let mut font_matrix = None;
@@ -40,7 +41,7 @@ impl<'a> Table<'a> {
                 b"/Encoding" => encoding = Some(s.read_encoding()),
                 b"eexec" => {
                     let decrypted = decrypt(s.tail().unwrap());
-                    println!("{:?}", std::str::from_utf8(&decrypted[0..12]));
+                    Self::parse_eexec(&decrypted);
                 }
                 b"/Private" => {
                     println!("reached private dict");
@@ -49,18 +50,107 @@ impl<'a> Table<'a> {
             }
         }
         
-        println!("{:?}", font_matrix);
-        println!("{:?}", encoding);
-        
         Some(
             Self {
                 data
             }
         )
     }
+    
+    fn parse_eexec(data: &[u8]) {
+        println!("{:?}", std::str::from_utf8(&data[0..700]));
+        let mut s = Stream::new(data);
+
+        while let Some(token) = s.next_token() {
+            match token {
+                b"/Subrs" => {
+                    let subs = s.parse_subroutines();
+                }
+                _ => {}
+            }
+        }
+    }
 }
 
 impl<'a> Stream<'a> {
+    fn next_int(&mut self) -> i32 {
+        i32::from_str(std::str::from_utf8(self.next_token().unwrap()).unwrap()).unwrap()
+    }
+    
+    fn parse_subroutines(&mut self) -> Vec<Vec<u8>> {
+        let mut subroutines = Vec::new();
+        
+        let num_subrs = u32::from_str(std::str::from_utf8(self.next_token().unwrap()).unwrap()).unwrap();
+        
+        if num_subrs < 1 {
+            return subroutines;
+        }
+        
+        if !self.skip_until_before(b"dup", |b| matches!(b, b"ND" | b"|-" | b"noaccess")) {
+            return subroutines;
+        }
+        
+        while let Some(token) = self.next_token() {
+            if matches!(token, b"ND" | b"|-") {
+                break;
+            }
+            
+            if token == b"noaccess" {
+                if self.next_token() == Some(b"def") {
+                    break;
+                }   else {
+                    panic!("invallid sequence noaccess");
+                }
+            }
+            
+            if token != b"dup" {
+                panic!(format!("expected dup, got token {:?} instead", &token));
+            }
+            
+            let subr_idx = self.next_int();
+            let bin_len = self.next_int();
+            
+            println!("{:?} {:?}", subr_idx, bin_len);
+            
+            let tok = self.next_token().unwrap();
+            
+            if tok != b"RD" && tok != b"-|" {
+                panic!(format!("invalid subroutine start token {:?}", tok));
+            }
+            
+            self.skip_whitespaces();
+            
+            // TODO: Decrypt
+            let subr = self.read_bytes(bin_len as usize).unwrap().to_vec();
+            subroutines.push(subr);
+            
+            let mut tok = self.next_token().unwrap();
+            if tok == b"NP" || tok == b"|" {
+                
+            }   else if tok == b"noaccess" {
+                tok = self.next_token().unwrap();
+                if tok == b"def" {
+                    break;
+                }
+                
+                if tok == b"put" {
+                    
+                }   else {
+                    panic!(format!("invallid subroutine end {:?}", tok));
+                }
+                
+            }   else {
+                panic!(format!("invalid subroutine end token {:?}", tok));   
+            }
+            
+            println!("idx: {subr_idx}, len {bin_len}");
+            
+            
+        }
+        
+        subroutines
+    }
+    
     fn peek_token(&mut self) -> Option<&'a [u8]> {
         self.clone().next_token()
     }
@@ -80,13 +170,11 @@ impl<'a> Stream<'a> {
             count
         };
         
+        self.skip_whitespaces();
+        
         while let Some(ch) = self.clone().read_bytes(1) {
             let tail = self.tail()?;
             self.read_bytes(1);
-            
-            if is_whitespace(ch[0]) {
-                continue;
-            }
             
             match ch[0] {
                 b'%' => self.skip_line_comment(),
@@ -146,6 +234,8 @@ impl<'a> Stream<'a> {
                     return Some(&tail[0..count])
                 }
             }
+
+            self.skip_whitespaces();
         }
         
         None
@@ -292,6 +382,14 @@ enum EncodingType {
     Custom(HashMap<u8, String>)
 }
 
+const RD: &[u8; 2] = b"RD";
+const RD_ALT: &[u8; 2] = &b"-|";
+
+const ND: &[u8; 2] = &b"ND";
+const ND_ALT: &[u8; 2] = &b"|-";
+
+const NP: &[u8; 2] = &b"NP";
+const NP_ALT: &[u8; 1] = &b"|";
 
 #[cfg(test)]
 mod tests {
