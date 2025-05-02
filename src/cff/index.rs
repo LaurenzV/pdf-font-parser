@@ -1,4 +1,4 @@
-use crate::parser::{FromData, NumFrom, Stream, U24};
+use super::parser::{FromData, NumFrom, Stream, U24};
 
 pub trait IndexSize: FromData {
     fn to_u32(self) -> u32;

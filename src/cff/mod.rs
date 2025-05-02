@@ -5,14 +5,15 @@ mod charstring;
 mod dict;
 mod encoding;
 mod index;
+pub(crate) mod parser;
 mod std_names;
 
 use core::convert::TryFrom;
 
-use crate::parser::{FromData, TryNumFrom};
 use crate::{OutlineBuilder, RectF};
+use parser::{FromData, TryNumFrom};
 
-pub use cff::{Table, Matrix};
+pub use cff::{Matrix, Table};
 
 /// A list of errors that can occur during a CFF glyph outlining.
 #[allow(missing_docs)]

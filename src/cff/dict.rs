@@ -1,7 +1,7 @@
 use core::convert::TryFrom;
 use core::ops::Range;
 
-use crate::Stream;
+use super::parser::Stream;
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
 const TWO_BYTE_OPERATOR_MARK: u8 = 12;

@@ -3,6 +3,7 @@
 //! This module should not be used directly, unless you're planning to parse
 //! some tables manually.
 
+use crate::GlyphId;
 use core::convert::{TryFrom, TryInto};
 
 /// A trait for parsing raw binary data of fixed size.
@@ -465,6 +466,15 @@ impl<'a, T: FromSlice<'a> + core::fmt::Debug + Copy> core::fmt::Debug for LazyOf
     }
 }
 
+impl FromData for GlyphId {
+    const SIZE: usize = 2;
+
+    #[inline]
+    fn parse(data: &[u8]) -> Option<Self> {
+        u16::parse(data).map(GlyphId)
+    }
+}
+
 /// An iterator over [`LazyOffsetArray16`] values.
 #[derive(Clone, Copy)]
 #[allow(missing_debug_implementations)]
@@ -506,7 +516,7 @@ impl<'a, T: FromSlice<'a>> Iterator for LazyOffsetArrayIter16<'a, T> {
 
 /// A streaming binary parser.
 #[derive(Clone, Default, Debug)]
-pub struct Stream<'a> {
+pub(crate) struct Stream<'a> {
     data: &'a [u8],
     offset: usize,
 }
@@ -575,10 +585,6 @@ impl<'a> Stream<'a> {
         self.read_bytes(T::SIZE).and_then(T::parse)
     }
 
-    pub fn peek<T: FromData>(&mut self) -> Option<T> {
-        self.clone().read::<T>()
-    }
-
     /// Reads N bytes from the stream.
     #[inline]
     pub fn read_bytes(&mut self, len: usize) -> Option<&'a [u8]> {
@@ -590,10 +596,6 @@ impl<'a> Stream<'a> {
         let v = self.data.get(self.offset..self.offset + len)?;
         self.advance(len);
         Some(v)
-    }
-    
-    pub fn move_back(&mut self, amount: usize) {
-        self.offset -= amount;
     }
 
     /// Reads the next `count` types as a slice.

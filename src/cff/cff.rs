@@ -16,9 +16,9 @@ use super::charstring::CharStringParser;
 use super::dict::DictionaryParser;
 use super::encoding::{parse_encoding, Encoding, STANDARD_ENCODING};
 use super::index::{parse_index, skip_index, Index};
+use super::parser::{LazyArray16, NumFrom, Stream, TryNumFrom};
 use super::std_names::STANDARD_NAMES;
 use super::{calc_subroutine_bias, conv_subroutine_index, Builder, CFFError, IsEven, StringId};
-use crate::parser::{LazyArray16, NumFrom, Stream, TryNumFrom};
 use crate::{DummyOutline, GlyphId, OutlineBuilder, Rect, RectF};
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
@@ -521,7 +521,7 @@ fn _parse_char_string(
                     operator::FLEX => p.parse_flex()?,
                     operator::HFLEX1 => p.parse_hflex1()?,
                     operator::FLEX1 => p.parse_flex1()?,
-                    operator::DOTSECTION => {},
+                    operator::DOTSECTION => {}
                     _ => return Err(CFFError::UnsupportedOperator),
                 }
             }

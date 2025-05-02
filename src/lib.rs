@@ -1,22 +1,12 @@
 pub mod cff;
 pub mod type1;
-mod parser;
 
-pub(crate) use parser::*;
+use crate::cff::parser::TryNumFrom;
 
 /// A type-safe wrapper for glyph ID.
 #[repr(transparent)]
 #[derive(Clone, Copy, Ord, PartialOrd, Eq, PartialEq, Default, Debug, Hash)]
 pub struct GlyphId(pub u16);
-
-impl FromData for GlyphId {
-    const SIZE: usize = 2;
-
-    #[inline]
-    fn parse(data: &[u8]) -> Option<Self> {
-        u16::parse(data).map(GlyphId)
-    }
-}
 
 /// A trait for glyph outline construction.
 pub trait OutlineBuilder {
@@ -48,7 +38,6 @@ impl OutlineBuilder for DummyOutline {
     fn curve_to(&mut self, _: f32, _: f32, _: f32, _: f32, _: f32, _: f32) {}
     fn close(&mut self) {}
 }
-
 
 /// A rectangle.
 ///

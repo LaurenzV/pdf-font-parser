@@ -1,6 +1,6 @@
 use super::argstack::ArgumentsStack;
+use super::parser::{Fixed, Stream};
 use super::{f32_abs, Builder, CFFError, IsEven};
-use crate::parser::{Fixed, Stream};
 
 pub(crate) struct CharStringParser<'a> {
     pub stack: ArgumentsStack<'a>,
