@@ -1,8 +1,10 @@
+mod decrypt;
+
 use std::collections::HashMap;
 use std::str::FromStr;
 use log::error;
 use crate::parser::Stream;
-
+use crate::type1::decrypt::decrypt;
 // Many parts of the parser code are adapted from
 // https://github.com/janpe2/CFFDump/blob/master/cff/type1/Type1Dump.java
 
@@ -36,6 +38,13 @@ impl<'a> Table<'a> {
                 b"/StrokeWidth" => s.skip_token(),
                 b"/FontMatrix" => font_matrix = Some(s.read_font_matrix()),
                 b"/Encoding" => encoding = Some(s.read_encoding()),
+                b"eexec" => {
+                    let decrypted = decrypt(s.tail().unwrap());
+                    println!("{:?}", std::str::from_utf8(&decrypted[0..12]));
+                }
+                b"/Private" => {
+                    println!("reached private dict");
+                }
                 _ => {}
             }
         }
@@ -228,6 +237,16 @@ impl<'a> Stream<'a> {
         }
         
         false
+    }
+    
+    fn skip_whitespaces(&mut self) {
+        while let Some(ch) = self.peek::<u8>() {
+            if is_whitespace(ch) {
+                self.read::<u8>();
+            }   else {
+                break;
+            }
+        }
     }
 
     fn skip_until_before(&mut self, find: &[u8], stop: impl Fn(&[u8]) -> bool) -> bool {

@@ -575,6 +575,10 @@ impl<'a> Stream<'a> {
         self.read_bytes(T::SIZE).and_then(T::parse)
     }
 
+    pub fn peek<T: FromData>(&mut self) -> Option<T> {
+        self.clone().read::<T>()
+    }
+
     /// Reads N bytes from the stream.
     #[inline]
     pub fn read_bytes(&mut self, len: usize) -> Option<&'a [u8]> {
