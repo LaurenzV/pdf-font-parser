@@ -1,14 +1,32 @@
 mod decrypt;
 mod stream;
 
-use crate::type1::decrypt::decrypt;
+use crate::type1::decrypt::{decrypt, decrypt_byte};
 use crate::type1::stream::Stream;
 use log::error;
 use std::collections::HashMap;
+use std::iter::Copied;
 use std::path::Component::ParentDir;
+use std::slice::Iter;
 use std::str::FromStr;
 // Many parts of the parser code are adapted from
 // https://github.com/janpe2/CFFDump/blob/master/cff/type1/Type1Dump.java
+
+struct Parameters {
+    font_matrix: Option<[f32; 6]>,
+    encoding_type: EncodingType,
+    subroutines: Vec<Vec<u8>>,
+}
+
+impl Default for Parameters {
+    fn default() -> Self {
+        Self {
+            font_matrix: None,
+            encoding_type: EncodingType::Standard,
+            subroutines: vec![],
+        }
+    }
+}
 
 pub struct Table<'a> {
     data: &'a [u8],
@@ -24,9 +42,7 @@ impl<'a> Table<'a> {
         }
 
         let mut s = Stream::new(data);
-
-        let mut font_matrix = None;
-        let mut encoding = None;
+        let mut params = Parameters::default();
 
         while let Some(token) = s.next_token() {
             match token {
@@ -38,11 +54,11 @@ impl<'a> Table<'a> {
                 b"/UniqueID" => s.skip_token(),
                 b"/Metrics" => s.skip_dict(),
                 b"/StrokeWidth" => s.skip_token(),
-                b"/FontMatrix" => font_matrix = Some(s.read_font_matrix()),
-                b"/Encoding" => encoding = Some(s.read_encoding()),
+                b"/FontMatrix" => params.font_matrix = Some(s.read_font_matrix()),
+                b"/Encoding" => params.encoding_type = s.read_encoding(),
                 b"eexec" => {
                     let decrypted = decrypt(s.tail().unwrap());
-                    Self::parse_eexec(&decrypted);
+                    Self::parse_eexec(&decrypted, &mut params);
                 }
                 b"/Private" => {
                     println!("reached private dict");
@@ -54,14 +70,18 @@ impl<'a> Table<'a> {
         Some(Self { data })
     }
 
-    fn parse_eexec(data: &[u8]) {
-        println!("{:?}", std::str::from_utf8(&data[0..700]));
+    fn parse_eexec(data: &[u8], params: &mut Parameters) {
         let mut s = Stream::new(data);
+        
+        let mut lenIv = 4;
 
         while let Some(token) = s.next_token() {
             match token {
                 b"/Subrs" => {
-                    let subs = s.parse_subroutines();
+                    params.subroutines = s.parse_subroutines(lenIv);
+                }
+                b"/lenIV" => {
+                    lenIv = s.next_int() as usize;
                 }
                 _ => {}
             }
@@ -74,7 +94,7 @@ impl<'a> Stream<'a> {
         i32::from_str(std::str::from_utf8(self.next_token().unwrap()).unwrap()).unwrap()
     }
 
-    fn parse_subroutines(&mut self) -> Vec<Vec<u8>> {
+    fn parse_subroutines(&mut self, len_iv: usize) -> Vec<Vec<u8>> {
         let mut subroutines = Vec::new();
 
         let num_subrs =
@@ -118,9 +138,23 @@ impl<'a> Stream<'a> {
 
             self.skip_whitespaces();
 
+            let mut r = 4330;
+            
             // TODO: Decrypt
-            let subr = self.read_bytes(bin_len as usize).unwrap().to_vec();
-            subroutines.push(subr);
+            let temp = self.read_bytes(bin_len as usize).unwrap();
+            let mut cb: Copied<Iter<u8>> = temp.iter().copied();
+            let mut decrypted = vec![];
+            
+            for i in 0..len_iv {
+                let _ = decrypt_byte(cb.next().unwrap(), &mut r);
+            }
+            
+            for byte in cb {
+                decrypted.push(decrypt_byte(byte, &mut r))
+            }
+            
+            
+            subroutines.push(decrypted);
 
             let mut tok = self.next_token().unwrap();
             if tok == b"NP" || tok == b"|" {
