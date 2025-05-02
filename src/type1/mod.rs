@@ -89,6 +89,15 @@ impl<'a> Table<'a> {
     }
 }
 
+const ND: &[u8] = b"ND";
+const ND_ALT: &[u8] = b"|-";
+
+const RD: &[u8] = b"RD";
+const RD_ALT: &[u8] = b"-|";
+
+const NP: &[u8] = b"NP";
+const NP_ALT: &[u8] = b"|";
+
 impl<'a> Stream<'a> {
     fn next_int(&mut self) -> i32 {
         i32::from_str(std::str::from_utf8(self.next_token().unwrap()).unwrap()).unwrap()
@@ -104,12 +113,12 @@ impl<'a> Stream<'a> {
             return subroutines;
         }
 
-        if !self.skip_until_before(b"dup", |b| matches!(b, b"ND" | b"|-" | b"noaccess")) {
+        if !self.skip_until_before(b"dup", |b| matches!(b, ND | ND_ALT | b"noaccess")) {
             return subroutines;
         }
 
         while let Some(token) = self.next_token() {
-            if matches!(token, b"ND" | b"|-") {
+            if matches!(token, ND | ND_ALT) {
                 break;
             }
 
@@ -122,7 +131,7 @@ impl<'a> Stream<'a> {
             }
 
             if token != b"dup" {
-                panic!(format!("expected dup, got token {:?} instead", &token));
+                panic!("expected dup, got token {:?} instead", &token);
             }
 
             let subr_idx = self.next_int();
@@ -132,7 +141,7 @@ impl<'a> Stream<'a> {
 
             let tok = self.next_token().unwrap();
 
-            if tok != b"RD" && tok != b"-|" {
+            if tok != RD && tok != RD_ALT {
                 panic!(format!("invalid subroutine start token {:?}", tok));
             }
 
@@ -143,7 +152,7 @@ impl<'a> Stream<'a> {
             subroutines.push(decrypt_charstring(encrypted_bytes, len_iv));
 
             let mut tok = self.next_token().unwrap();
-            if tok == b"NP" || tok == b"|" {
+            if tok == NP || tok == NP_ALT {
             } else if tok == b"noaccess" {
                 tok = self.next_token().unwrap();
                 if tok == b"def" {
@@ -416,15 +425,6 @@ enum EncodingType {
     Standard,
     Custom(HashMap<u8, String>),
 }
-
-const RD: &[u8; 2] = b"RD";
-const RD_ALT: &[u8; 2] = &b"-|";
-
-const ND: &[u8; 2] = &b"ND";
-const ND_ALT: &[u8; 2] = &b"|-";
-
-const NP: &[u8; 2] = &b"NP";
-const NP_ALT: &[u8; 1] = &b"|";
 
 #[cfg(test)]
 mod tests {
