@@ -1,4 +1,5 @@
 pub mod cff;
+pub mod type1;
 mod parser;
 
 pub(crate) use parser::*;

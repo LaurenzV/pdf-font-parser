@@ -587,6 +587,10 @@ impl<'a> Stream<'a> {
         self.advance(len);
         Some(v)
     }
+    
+    pub fn move_back(&mut self, amount: usize) {
+        self.offset -= amount;
+    }
 
     /// Reads the next `count` types as a slice.
     #[inline]

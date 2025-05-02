@@ -12,6 +12,8 @@ use core::convert::TryFrom;
 use crate::parser::{FromData, TryNumFrom};
 use crate::{OutlineBuilder, RectF};
 
+pub use cff::{Table, Matrix};
+
 /// A list of errors that can occur during a CFF glyph outlining.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

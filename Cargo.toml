@@ -12,3 +12,6 @@ repository = "https://github.com/LaurenzV/pdf-font-parser"
 readme = "README.md"
 edition = "2018"
 rust-version = "1.63.0"
+
+[dependencies]
+log = "0.4.27"
