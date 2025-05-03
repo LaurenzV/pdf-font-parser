@@ -186,6 +186,8 @@ impl<'a> Stream<'a> {
                 if glyph_name.starts_with(b"/") {
                     glyph_name = &glyph_name[1..];
                 }
+                
+                self.read_byte();
             } else {
                 let tok = self.next_token().unwrap();
                 if tok == b"end" {
@@ -202,23 +204,30 @@ impl<'a> Stream<'a> {
                 let tok = self.next_token().unwrap();
 
                 if tok == RD || tok == RD_ALT {
+                    self.read_byte();
                 } else {
                     panic!("invalid charstring in start, expected RD");
                 }
             }
 
-            self.skip_whitespaces();
-
+            let string_name = std::str::from_utf8(glyph_name).unwrap();
+            
+            if string_name == "x" {
+                let a = 3;
+                println!("yes");
+            }
+            
             let encrypted_bytes = self.read_bytes(bin_len as usize).unwrap();
+            let decrypted_bytes = decrypt_charstring(encrypted_bytes, len_iv);
             charstrings.insert(
                 std::str::from_utf8(glyph_name).unwrap().to_string(),
-                decrypt_charstring(encrypted_bytes, len_iv),
+                decrypted_bytes,
             );
-
+            
             let tok = self.next_token().unwrap();
             if tok == ND || tok == ND_ALT {
             } else {
-                panic!("invalid charstring in end, expected ND");
+                panic!("invalid charstring in end, expected ND, found {:?}", tok);
             }
         }
 
@@ -263,9 +272,10 @@ impl<'a> Stream<'a> {
 
             if tok != RD && tok != RD_ALT {
                 panic!("invalid subroutine start token {:?}", tok);
+            }   else {
+                // WHitespace
+                self.read_byte();
             }
-
-            self.skip_whitespaces();
 
             // TODO: Decrypt
             let encrypted_bytes = self.read_bytes(bin_len as usize).unwrap();

@@ -237,8 +237,6 @@ fn _parse_char_string(
                 p.x = p.stack.at(0);
                 p.y = 0.0;
 
-                println!("set to {}", p.x);
-
                 p.stack.clear();
             }
             sb_operator::ENDCHAR => {
