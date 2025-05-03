@@ -19,6 +19,11 @@ impl<'a> Stream<'a> {
     }
 
     #[inline]
+    pub fn at_end(&self) -> bool {
+        self.offset >= self.data.len()
+    }
+
+    #[inline]
     pub fn peek_byte(&mut self) -> Option<u8> {
         self.clone().read_byte()
     }

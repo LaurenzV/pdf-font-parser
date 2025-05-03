@@ -1,7 +1,11 @@
+mod charstring;
 mod decrypt;
+mod operator;
+mod standard;
 mod stream;
 
 use crate::type1::decrypt::{decrypt, decrypt_byte};
+use crate::type1::standard::STANDARD;
 use crate::type1::stream::Stream;
 use log::error;
 use std::collections::HashMap;
@@ -12,7 +16,7 @@ use std::str::FromStr;
 // Many parts of the parser code are adapted from
 // https://github.com/janpe2/CFFDump/blob/master/cff/type1/Type1Dump.java
 
-struct Parameters {
+pub(crate) struct Parameters {
     font_matrix: Option<[f32; 6]>,
     encoding_type: EncodingType,
     subroutines: Vec<Vec<u8>>,
@@ -110,56 +114,58 @@ impl<'a> Stream<'a> {
 
     fn parse_charstrings(&mut self, len_iv: usize) -> Option<Vec<Vec<u8>>> {
         let mut charstrings = vec![];
-        
+
         let mut first_glyph_name = None;
         let mut int_token = None;
-        
+
         while let Some(token) = self.next_token() {
             if token == b"end" {
                 return Some(charstrings);
             }
-            
+
             if token.starts_with(b"/") {
                 first_glyph_name = Some(token);
-            }   else if token.iter().all(|b| matches!(*b, b'#') || b.is_ascii_digit()) {
+            } else if token
+                .iter()
+                .all(|b| matches!(*b, b'#') || b.is_ascii_digit())
+            {
                 int_token = Some(i32::from_str(std::str::from_utf8(token).unwrap()).unwrap());
-            }   else if token == RD || token == RD_ALT {
+            } else if token == RD || token == RD_ALT {
                 break;
             }
         }
-        
+
         let (first_glyph_name, int_token) = (first_glyph_name.unwrap(), int_token.unwrap());
-        
+
         let mut is_first = true;
-        
+
         loop {
             let mut bin_len;
             let mut glyph_name;
-            
+
             if is_first {
                 is_first = false;
                 bin_len = int_token;
                 glyph_name = first_glyph_name;
-                
+
                 if glyph_name.starts_with(b"/") {
                     glyph_name = &glyph_name[1..];
                 }
-            }   else {
+            } else {
                 let tok = self.next_token().unwrap();
                 if tok == b"end" {
                     break;
                 }
-                
+
                 if tok.starts_with(b"/") {
                     glyph_name = &tok[1..];
                 }
-                
+
                 bin_len = self.next_int();
                 let tok = self.next_token().unwrap();
-                
+
                 if tok == RD || tok == RD_ALT {
-                    
-                }   else {
+                } else {
                     panic!("invalid charstring in start, expected RD");
                 }
             }
@@ -169,18 +175,17 @@ impl<'a> Stream<'a> {
             // TODO: Decrypt
             let encrypted_bytes = self.read_bytes(bin_len as usize).unwrap();
             charstrings.push(decrypt_charstring(encrypted_bytes, len_iv));
-            
+
             let tok = self.next_token().unwrap();
             if tok == ND || tok == ND_ALT {
-                
-            }   else {
+            } else {
                 panic!("invalid charstring in end, expected ND");
             }
         }
-        
+
         Some(charstrings)
     }
-    
+
     fn parse_subroutines(&mut self, len_iv: usize) -> Vec<Vec<u8>> {
         let mut subroutines = Vec::new();
 
@@ -471,7 +476,9 @@ fn decrypt_charstring(data: &[u8], len_iv: usize) -> Vec<u8> {
     for byte in cb {
         decrypted.push(decrypt_byte(byte, &mut r))
     }
-    
+
+    println!("decrypted: {:?}", decrypted);
+
     decrypted
 }
 
@@ -499,9 +506,18 @@ fn is_self_delim_after_token(c: u8) -> bool {
 }
 
 #[derive(Debug)]
-enum EncodingType {
+pub(crate) enum EncodingType {
     Standard,
     Custom(HashMap<u8, String>),
+}
+
+impl EncodingType {
+    pub(crate) fn encode(&self, code: u8) -> &str {
+        match self {
+            EncodingType::Standard => STANDARD.get(&code).copied().unwrap_or("notdef"),
+            EncodingType::Custom(c) => c.get(&code).map(|s| s.as_str()).unwrap_or("notdef"),
+        }
+    }
 }
 
 #[cfg(test)]

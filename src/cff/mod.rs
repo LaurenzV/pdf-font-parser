@@ -1,7 +1,7 @@
-mod argstack;
+pub(crate) mod argstack;
 pub mod cff;
 mod charset;
-mod charstring;
+pub(crate) mod charstring;
 mod dict;
 mod encoding;
 mod index;
@@ -34,38 +34,6 @@ pub enum CFFError {
     InvalidSubroutineIndex,
     NoLocalSubroutines,
     InvalidSeacCode,
-}
-
-pub(crate) struct Builder<'a> {
-    builder: &'a mut dyn OutlineBuilder,
-    bbox: RectF,
-}
-
-impl<'a> Builder<'a> {
-    #[inline]
-    fn move_to(&mut self, x: f32, y: f32) {
-        self.bbox.extend_by(x, y);
-        self.builder.move_to(x, y);
-    }
-
-    #[inline]
-    fn line_to(&mut self, x: f32, y: f32) {
-        self.bbox.extend_by(x, y);
-        self.builder.line_to(x, y);
-    }
-
-    #[inline]
-    fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {
-        self.bbox.extend_by(x1, y1);
-        self.bbox.extend_by(x2, y2);
-        self.bbox.extend_by(x, y);
-        self.builder.curve_to(x1, y1, x2, y2, x, y);
-    }
-
-    #[inline]
-    fn close(&mut self) {
-        self.builder.close();
-    }
 }
 
 /// A type-safe wrapper for string ID.
