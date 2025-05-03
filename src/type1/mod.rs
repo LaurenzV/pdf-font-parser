@@ -13,7 +13,6 @@ use crate::{Matrix, OutlineBuilder};
 use log::error;
 use std::collections::HashMap;
 use std::iter::Copied;
-use std::path::Component::ParentDir;
 use std::slice::Iter;
 use std::str::FromStr;
 // Many parts of the parser code are adapted from
@@ -173,7 +172,7 @@ impl<'a> Stream<'a> {
         let mut is_first = true;
 
         loop {
-            let mut bin_len;
+            let bin_len;
             let mut glyph_name;
 
             if is_first {
@@ -262,7 +261,7 @@ impl<'a> Stream<'a> {
             let tok = self.next_token().unwrap();
 
             if tok != RD && tok != RD_ALT {
-                panic!(format!("invalid subroutine start token {:?}", tok));
+                panic!("invalid subroutine start token {:?}", tok);
             }
 
             self.skip_whitespaces();
@@ -281,10 +280,10 @@ impl<'a> Stream<'a> {
 
                 if tok == b"put" {
                 } else {
-                    panic!(format!("invallid subroutine end {:?}", tok));
+                    panic!("invallid subroutine end {:?}", tok);
                 }
             } else {
-                panic!(format!("invalid subroutine end token {:?}", tok));
+                panic!("invalid subroutine end token {:?}", tok);
             }
 
             println!("idx: {subr_idx}, len {bin_len}");
@@ -298,7 +297,7 @@ impl<'a> Stream<'a> {
     }
 
     fn next_token(&mut self) -> Option<&'a [u8]> {
-        let mut skip_token = |st: &mut Stream| -> usize {
+        let skip_token = |st: &mut Stream| -> usize {
             let mut count = 1;
             while let Some(ch) = st.read_bytes(1) {
                 if is_whitespace(ch[0]) || is_self_delim_after_token(ch[0]) {

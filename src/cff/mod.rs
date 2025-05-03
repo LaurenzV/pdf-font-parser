@@ -9,7 +9,6 @@ mod std_names;
 
 use core::convert::TryFrom;
 
-use crate::{OutlineBuilder, RectF};
 use parser::{FromData, TryNumFrom};
 
 pub use cff::Table;

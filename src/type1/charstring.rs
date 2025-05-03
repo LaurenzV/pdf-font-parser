@@ -1,10 +1,10 @@
 use crate::argstack::ArgumentsStack;
-use crate::cff::{CFFError, IsEven};
+use crate::cff::CFFError;
 use crate::type1::charstring_parser::CharStringParser;
 use crate::type1::operator::{sb_operator, tb_operator};
 use crate::type1::stream::Stream;
-use crate::type1::{operator, Parameters};
-use crate::{Builder, GlyphId, OutlineBuilder, Rect, RectF};
+use crate::type1::Parameters;
+use crate::{Builder, OutlineBuilder, RectF};
 use log::{error, trace, warn};
 
 const MAX_ARGUMENTS_STACK_LEN: usize = 48;
