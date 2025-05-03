@@ -5,7 +5,7 @@ use crate::type1::operator::{sb_operator, tb_operator};
 use crate::type1::stream::Stream;
 use crate::type1::Parameters;
 use crate::{Builder, OutlineBuilder, RectF};
-use log::{error, trace, warn};
+use log::{debug, error, trace, warn};
 
 const MAX_ARGUMENTS_STACK_LEN: usize = 48;
 const STACK_LIMIT: u8 = 10;
@@ -40,18 +40,12 @@ pub(crate) fn parse_char_string(
         max_len: MAX_ARGUMENTS_STACK_LEN,
     };
 
-    let ps_stack = ArgumentsStack {
-        data: &mut [0.0; MAX_ARGUMENTS_STACK_LEN], // 192B
-        len: 0,
-        max_len: MAX_ARGUMENTS_STACK_LEN,
-    };
-
     let mut parser = CharStringParser {
         stack,
-        ps_stack,
         builder: &mut inner_builder,
         x: 0.0,
         y: 0.0,
+        is_flexing: false,
     };
     _parse_char_string(&mut ctx, data, 0, &mut parser)?;
 
@@ -68,12 +62,18 @@ fn _parse_char_string(
     depth: u8,
     p: &mut CharStringParser,
 ) -> Result<(), CFFError> {
+    macro_rules! trace_op {
+        ($name:literal) => {
+            debug!("{} ({})", $name, &p.stack.dump());
+        };
+    }
+
     let mut s = Stream::new(char_string);
     while !s.at_end() {
         let op = s.read_byte().ok_or(CFFError::ReadOutOfBounds)?;
         match op {
             sb_operator::HORIZONTAL_STEM | sb_operator::VERTICAL_STEM => {
-                trace!("HORIZONTAL_STEM | VERTICAL_STEM");
+                trace_op!("HORIZONTAL_STEM | VERTICAL_STEM");
                 let len = p.stack.len();
 
                 ctx.stems_len += len as u32 >> 1;
@@ -81,37 +81,37 @@ fn _parse_char_string(
                 p.stack.clear();
             }
             sb_operator::VERTICAL_MOVE_TO => {
-                trace!("VERTICAL_MOVE_TO");
+                trace_op!("VERTICAL_MOVE_TO");
 
                 p.parse_vertical_move_to()?;
             }
             sb_operator::LINE_TO => {
-                trace!("LINE_TO");
+                trace_op!("LINE_TO");
 
                 p.parse_line_to()?;
             }
             sb_operator::HORIZONTAL_LINE_TO => {
-                trace!("HORIZONTAL_LINE_TO");
+                trace_op!("HORIZONTAL_LINE_TO");
 
                 p.parse_horizontal_line_to()?;
             }
             sb_operator::VERTICAL_LINE_TO => {
-                trace!("VERTICAL_LINE_TO");
+                trace_op!("VERTICAL_LINE_TO");
 
                 p.parse_vertical_line_to()?;
             }
             sb_operator::CURVE_TO => {
-                trace!("CURVE_TO");
+                trace_op!("CURVE_TO");
 
                 p.parse_curve_to()?;
             }
             sb_operator::CLOSE_PATH => {
-                trace!("CLOSE_PATH");
+                trace_op!("CLOSE_PATH");
 
                 p.parse_close_path()?;
             }
             sb_operator::CALL_SUBR => {
-                trace!("CALL_SUBR");
+                trace_op!("CALL_SUBR");
 
                 if p.stack.is_empty() {
                     return Err(CFFError::InvalidArgumentsStackLength);
@@ -130,7 +130,7 @@ fn _parse_char_string(
                 }
             }
             sb_operator::RETURN => {
-                trace!("RETURN");
+                trace_op!("RETURN");
 
                 break;
             }
@@ -139,22 +139,22 @@ fn _parse_char_string(
 
                 match op {
                     tb_operator::DOTSECTION => {
-                        trace!("DOTSECTION");
+                        trace_op!("DOTSECTION");
 
                         p.stack.clear();
                     }
                     tb_operator::VSTEM3 => {
-                        trace!("VSTEM3");
+                        trace_op!("VSTEM3");
 
                         p.stack.clear();
                     }
                     tb_operator::HSTEM3 => {
-                        trace!("HSTEM3");
+                        trace_op!("HSTEM3");
 
                         p.stack.clear();
                     }
                     tb_operator::SEAC => {
-                        trace!("SEAC");
+                        trace_op!("SEAC");
 
                         if p.stack.len != 5 {
                             return Err(CFFError::InvalidArgumentsStackLength);
@@ -190,31 +190,39 @@ fn _parse_char_string(
                         break;
                     }
                     tb_operator::SBW => {
-                        trace!("SBW");
+                        trace_op!("SBW");
                         p.x = p.stack.at(0);
                         p.y = p.stack.at(1);
 
                         p.stack.clear();
                     }
                     tb_operator::DIV => {
-                        trace!("DIV");
+                        trace_op!("DIV");
                         let num2 = p.stack.pop();
                         let num1 = p.stack.pop();
 
                         p.stack.push(num1 / num2)?;
                     }
                     tb_operator::CALL_OTHER_SUBR => {
-                        trace!("CALL_OTHER_SUBR");
+                        trace_op!("CALL_OTHER_SUBR");
 
-                        panic!("CALL_OTHER_SUBR hasnt been implemented yet.");
+                        let subr_index = p.stack.pop() as i32;
+                        let n_args = p.stack.pop() as i32;
+
+                        if subr_index == 1 && n_args == 0 {
+                            p.is_flexing = true;
+                        } else if subr_index == 0 && n_args == 3 {
+                            p.parse_flex()?;
+                            p.is_flexing = false;
+                        } else {
+                            trace!("ignoring call_other_subr with {}, {}", subr_index, n_args);
+                        }
                     }
                     tb_operator::POP => {
-                        trace!("POP");
-                        let val = p.ps_stack.pop();
-                        p.stack.push(val)?;
+                        trace_op!("POP");
                     }
                     tb_operator::SET_CURRENT_POINT => {
-                        trace!("SET_CURRENT_POINT");
+                        trace_op!("SET_CURRENT_POINT");
                         p.x = p.stack.at(0);
                         p.y = p.stack.at(1);
 
@@ -224,7 +232,7 @@ fn _parse_char_string(
                 }
             }
             sb_operator::HSBW => {
-                trace!("HSBW");
+                trace_op!("HSBW");
 
                 p.x = p.stack.at(0);
                 p.y = 0.0;
@@ -234,28 +242,28 @@ fn _parse_char_string(
                 p.stack.clear();
             }
             sb_operator::ENDCHAR => {
-                trace!("ENDCHAR");
+                trace_op!("ENDCHAR");
                 ctx.has_endchar = true;
 
                 break;
             }
             sb_operator::MOVE_TO => {
-                trace!("MOVE_TO");
+                trace_op!("MOVE_TO");
 
                 p.parse_move_to()?;
             }
             sb_operator::HORIZONTAL_MOVE_TO => {
-                trace!("HORIZONTAL_MOVE_TO");
+                trace_op!("HORIZONTAL_MOVE_TO");
 
                 p.parse_horizontal_move_to()?;
             }
             sb_operator::VH_CURVE_TO => {
-                trace!("VH_CURVE_TO");
+                trace_op!("VH_CURVE_TO");
 
                 p.parse_vh_curve_to()?;
             }
             sb_operator::HV_CURVE_TO => {
-                trace!("HV_CURVE_TO");
+                trace_op!("HV_CURVE_TO");
 
                 p.parse_hv_curve_to()?;
             }

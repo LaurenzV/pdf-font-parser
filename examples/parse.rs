@@ -1,4 +1,6 @@
+use log::trace;
 use pdf_font_parser::type1::Table;
+use pdf_font_parser::OutlineBuilder;
 
 fn main() {
     if let Ok(()) = log::set_logger(&LOGGER) {
@@ -6,14 +8,34 @@ fn main() {
     }
 
     let file1 = include_bytes!("../font-0009.pfa");
-    let file2 = include_bytes!("../font-0011.pfa");
-    let file3 = include_bytes!("../font-0013.pfa");
 
-    for file in [&file1[..], &file2[..], &file3[..]] {
+    let mut out = DummyOutline;
+
+    for file in [&file1[..]] {
         // for file in [&file1[..]] {
-        println!("new file");
         let table = Table::parse(&file[..]).unwrap();
+
+        for c in 0..=255 {
+            table.code_to_string(c).map(|c| {
+                trace!("Outlining {}", c);
+                table.outline(c, &mut out)
+            });
+        }
     }
+}
+
+struct DummyOutline;
+
+impl OutlineBuilder for DummyOutline {
+    fn move_to(&mut self, x: f32, y: f32) {}
+
+    fn line_to(&mut self, x: f32, y: f32) {}
+
+    fn quad_to(&mut self, x1: f32, y1: f32, x: f32, y: f32) {}
+
+    fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x: f32, y: f32) {}
+
+    fn close(&mut self) {}
 }
 
 /// A simple stderr logger.
@@ -21,7 +43,7 @@ static LOGGER: SimpleLogger = SimpleLogger;
 struct SimpleLogger;
 impl log::Log for SimpleLogger {
     fn enabled(&self, metadata: &log::Metadata) -> bool {
-        metadata.level() <= log::LevelFilter::Warn
+        metadata.level() <= log::LevelFilter::Trace
     }
 
     fn log(&self, record: &log::Record) {

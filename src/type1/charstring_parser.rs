@@ -5,19 +5,17 @@ use crate::Builder;
 
 pub(crate) struct CharStringParser<'a> {
     pub stack: ArgumentsStack<'a>,
-    pub ps_stack: ArgumentsStack<'a>,
     pub builder: &'a mut Builder<'a>,
     pub x: f32,
     pub y: f32,
+    pub is_flexing: bool,
 }
 
 impl CharStringParser<'_> {
     #[inline]
     pub fn parse_move_to(&mut self) -> Result<(), CFFError> {
-        // dx1 dy1
-
-        if self.stack.len() != 2 {
-            return Err(CFFError::InvalidArgumentsStackLength);
+        if self.is_flexing {
+            return Ok(());
         }
 
         self.x += self.stack.at(0);
@@ -30,8 +28,9 @@ impl CharStringParser<'_> {
 
     #[inline]
     pub fn parse_horizontal_move_to(&mut self) -> Result<(), CFFError> {
-        if self.stack.len() != 1 {
-            return Err(CFFError::InvalidArgumentsStackLength);
+        if self.is_flexing {
+            self.stack.push(0.0)?;
+            return Ok(());
         }
 
         self.x += self.stack.at(0);
@@ -43,8 +42,10 @@ impl CharStringParser<'_> {
 
     #[inline]
     pub fn parse_vertical_move_to(&mut self) -> Result<(), CFFError> {
-        if self.stack.len() != 1 {
-            return Err(CFFError::InvalidArgumentsStackLength);
+        if self.is_flexing {
+            self.stack.push(0.0)?;
+            self.stack.exch();
+            return Ok(());
         }
 
         self.y += self.stack.at(0);
@@ -56,10 +57,6 @@ impl CharStringParser<'_> {
 
     #[inline]
     pub fn parse_line_to(&mut self) -> Result<(), CFFError> {
-        if self.stack.len().is_odd() {
-            return Err(CFFError::InvalidArgumentsStackLength);
-        }
-
         let mut i = 0;
         while i < self.stack.len() {
             self.x += self.stack.at(i + 0);
@@ -74,10 +71,6 @@ impl CharStringParser<'_> {
 
     #[inline]
     pub fn parse_horizontal_line_to(&mut self) -> Result<(), CFFError> {
-        if self.stack.is_empty() {
-            return Err(CFFError::InvalidArgumentsStackLength);
-        }
-
         let mut i = 0;
         while i < self.stack.len() {
             self.x += self.stack.at(i);
@@ -99,10 +92,6 @@ impl CharStringParser<'_> {
 
     #[inline]
     pub fn parse_vertical_line_to(&mut self) -> Result<(), CFFError> {
-        if self.stack.is_empty() {
-            return Err(CFFError::InvalidArgumentsStackLength);
-        }
-
         let mut i = 0;
         while i < self.stack.len() {
             self.y += self.stack.at(i);
@@ -124,10 +113,6 @@ impl CharStringParser<'_> {
 
     #[inline]
     pub fn parse_curve_to(&mut self) -> Result<(), CFFError> {
-        if self.stack.len() % 6 != 0 {
-            return Err(CFFError::InvalidArgumentsStackLength);
-        }
-
         let mut i = 0;
         while i < self.stack.len() {
             let x1 = self.x + self.stack.at(i + 0);
@@ -147,14 +132,6 @@ impl CharStringParser<'_> {
 
     #[inline]
     pub fn parse_curve_line(&mut self) -> Result<(), CFFError> {
-        if self.stack.len() < 8 {
-            return Err(CFFError::InvalidArgumentsStackLength);
-        }
-
-        if (self.stack.len() - 2) % 6 != 0 {
-            return Err(CFFError::InvalidArgumentsStackLength);
-        }
-
         let mut i = 0;
         while i < self.stack.len() - 2 {
             let x1 = self.x + self.stack.at(i + 0);
@@ -178,14 +155,6 @@ impl CharStringParser<'_> {
 
     #[inline]
     pub fn parse_line_curve(&mut self) -> Result<(), CFFError> {
-        if self.stack.len() < 8 {
-            return Err(CFFError::InvalidArgumentsStackLength);
-        }
-
-        if (self.stack.len() - 6).is_odd() {
-            return Err(CFFError::InvalidArgumentsStackLength);
-        }
-
         let mut i = 0;
         while i < self.stack.len() - 6 {
             self.x += self.stack.at(i + 0);
@@ -359,106 +328,48 @@ impl CharStringParser<'_> {
         Ok(())
     }
 
+    // Copied from fonttools.
     #[inline]
     pub fn parse_flex(&mut self) -> Result<(), CFFError> {
-        if self.stack.len() != 13 {
-            return Err(CFFError::InvalidArgumentsStackLength);
-        }
+        let final_y = self.stack.pop();
+        let final_x = self.stack.pop();
+        let _ = self.stack.pop(); // Ignored
 
-        let dx1 = self.x + self.stack.at(0);
-        let dy1 = self.y + self.stack.at(1);
-        let dx2 = dx1 + self.stack.at(2);
-        let dy2 = dy1 + self.stack.at(3);
-        let dx3 = dx2 + self.stack.at(4);
-        let dy3 = dy2 + self.stack.at(5);
-        let dx4 = dx3 + self.stack.at(6);
-        let dy4 = dy3 + self.stack.at(7);
-        let dx5 = dx4 + self.stack.at(8);
-        let dy5 = dy4 + self.stack.at(9);
-        self.x = dx5 + self.stack.at(10);
-        self.y = dy5 + self.stack.at(11);
-        self.builder.curve_to(dx1, dy1, dx2, dy2, dx3, dy3);
-        self.builder.curve_to(dx4, dy4, dx5, dy5, self.x, self.y);
+        let p3y = self.stack.pop();
+        let p3x = self.stack.pop();
+        let bcp4y = self.stack.pop();
+        let bcp4x = self.stack.pop();
+        let bcp3y = self.stack.pop();
+        let bcp3x = self.stack.pop();
+        let p2y = self.stack.pop();
+        let p2x = self.stack.pop();
+        let bcp2y = self.stack.pop();
+        let bcp2x = self.stack.pop();
+        let bcp1y = self.stack.pop();
+        let bcp1x = self.stack.pop();
+        let rpy = self.stack.pop();
+        let rpx = self.stack.pop();
 
-        self.stack.clear();
-        Ok(())
-    }
+        self.stack.push(bcp1x + rpx)?;
+        self.stack.push(bcp1y + rpy)?;
+        self.stack.push(bcp2x)?;
+        self.stack.push(bcp2y)?;
+        self.stack.push(p2x)?;
+        self.stack.push(p2y)?;
+        self.parse_curve_to()?;
 
-    #[inline]
-    pub fn parse_flex1(&mut self) -> Result<(), CFFError> {
-        if self.stack.len() != 11 {
-            return Err(CFFError::InvalidArgumentsStackLength);
-        }
+        self.stack.push(bcp3x)?;
+        self.stack.push(bcp3y)?;
+        self.stack.push(bcp4x)?;
+        self.stack.push(bcp4y)?;
+        self.stack.push(p3x)?;
+        self.stack.push(p3y)?;
+        self.parse_curve_to()?;
 
-        let dx1 = self.x + self.stack.at(0);
-        let dy1 = self.y + self.stack.at(1);
-        let dx2 = dx1 + self.stack.at(2);
-        let dy2 = dy1 + self.stack.at(3);
-        let dx3 = dx2 + self.stack.at(4);
-        let dy3 = dy2 + self.stack.at(5);
-        let dx4 = dx3 + self.stack.at(6);
-        let dy4 = dy3 + self.stack.at(7);
-        let dx5 = dx4 + self.stack.at(8);
-        let dy5 = dy4 + self.stack.at(9);
+        // Push final position back on the stack
+        self.stack.push(final_x)?;
+        self.stack.push(final_y)?;
 
-        if f32_abs(dx5 - self.x) > f32_abs(dy5 - self.y) {
-            self.x = dx5 + self.stack.at(10);
-        } else {
-            self.y = dy5 + self.stack.at(10);
-        }
-
-        self.builder.curve_to(dx1, dy1, dx2, dy2, dx3, dy3);
-        self.builder.curve_to(dx4, dy4, dx5, dy5, self.x, self.y);
-
-        self.stack.clear();
-        Ok(())
-    }
-
-    #[inline]
-    pub fn parse_hflex(&mut self) -> Result<(), CFFError> {
-        if self.stack.len() != 7 {
-            return Err(CFFError::InvalidArgumentsStackLength);
-        }
-
-        let dx1 = self.x + self.stack.at(0);
-        let dy1 = self.y;
-        let dx2 = dx1 + self.stack.at(1);
-        let dy2 = dy1 + self.stack.at(2);
-        let dx3 = dx2 + self.stack.at(3);
-        let dy3 = dy2;
-        let dx4 = dx3 + self.stack.at(4);
-        let dy4 = dy2;
-        let dx5 = dx4 + self.stack.at(5);
-        let dy5 = self.y;
-        self.x = dx5 + self.stack.at(6);
-        self.builder.curve_to(dx1, dy1, dx2, dy2, dx3, dy3);
-        self.builder.curve_to(dx4, dy4, dx5, dy5, self.x, self.y);
-
-        self.stack.clear();
-        Ok(())
-    }
-
-    #[inline]
-    pub fn parse_hflex1(&mut self) -> Result<(), CFFError> {
-        if self.stack.len() != 9 {
-            return Err(CFFError::InvalidArgumentsStackLength);
-        }
-
-        let dx1 = self.x + self.stack.at(0);
-        let dy1 = self.y + self.stack.at(1);
-        let dx2 = dx1 + self.stack.at(2);
-        let dy2 = dy1 + self.stack.at(3);
-        let dx3 = dx2 + self.stack.at(4);
-        let dy3 = dy2;
-        let dx4 = dx3 + self.stack.at(5);
-        let dy4 = dy2;
-        let dx5 = dx4 + self.stack.at(6);
-        let dy5 = dy4 + self.stack.at(7);
-        self.x = dx5 + self.stack.at(8);
-        self.builder.curve_to(dx1, dy1, dx2, dy2, dx3, dy3);
-        self.builder.curve_to(dx4, dy4, dx5, dy5, self.x, self.y);
-
-        self.stack.clear();
         Ok(())
     }
 

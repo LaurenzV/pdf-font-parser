@@ -40,6 +40,10 @@ impl<'a> ArgumentsStack<'a> {
         self.data[self.len]
     }
 
+    pub fn dump(&self) -> String {
+        format!("{:?}", &self.data[0..self.len])
+    }
+
     #[inline]
     pub fn reverse(&mut self) {
         if self.is_empty() {
@@ -54,6 +58,13 @@ impl<'a> ArgumentsStack<'a> {
     #[inline]
     pub fn clear(&mut self) {
         self.len = 0;
+    }
+
+    #[inline]
+    pub fn exch(&mut self) {
+        let len = self.len();
+        debug_assert!(len > 1);
+        self.data.swap(len - 1, len - 2);
     }
 }
 
