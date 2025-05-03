@@ -19,11 +19,11 @@ use std::sync::Arc;
 // Many parts of the parser code are adapted from
 // https://github.com/janpe2/CFFDump/blob/master/cff/type1/Type1Dump.java
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub(crate) struct Parameters {
     font_matrix: Matrix,
     encoding_type: EncodingType,
-    subroutines: Vec<Vec<u8>>,
+    subroutines: HashMap<u32, Vec<u8>>,
     charstrings: HashMap<String, Vec<u8>>,
 }
 
@@ -32,7 +32,7 @@ impl Default for Parameters {
         Self {
             font_matrix: Matrix::default(),
             encoding_type: EncodingType::Standard,
-            subroutines: vec![],
+            subroutines: HashMap::new(),
             charstrings: HashMap::new(),
         }
     }
@@ -41,7 +41,7 @@ impl Default for Parameters {
 #[derive(Debug, Clone)]
 pub struct Table<'a> {
     data: &'a [u8],
-    params: Parameters,
+    params: Arc<Parameters>,
 }
 
 impl<'a> Table<'a> {
@@ -89,7 +89,7 @@ impl<'a> Table<'a> {
             }
         }
 
-        Some(Self { data, params })
+        Some(Self { data, params: Arc::new(params) })
     }
 
     fn parse_eexec(data: &[u8], params: &mut Parameters) {
@@ -234,8 +234,8 @@ impl<'a> Stream<'a> {
         Some(charstrings)
     }
 
-    fn parse_subroutines(&mut self, len_iv: usize) -> Vec<Vec<u8>> {
-        let mut subroutines = Vec::new();
+    fn parse_subroutines(&mut self, len_iv: usize) -> HashMap<u32, Vec<u8>> {
+        let mut subroutines = HashMap::new();
 
         let num_subrs =
             u32::from_str(std::str::from_utf8(self.next_token().unwrap()).unwrap()).unwrap();
@@ -279,7 +279,7 @@ impl<'a> Stream<'a> {
 
             // TODO: Decrypt
             let encrypted_bytes = self.read_bytes(bin_len as usize).unwrap();
-            subroutines.push(decrypt_charstring(encrypted_bytes, len_iv));
+            subroutines.insert(subr_idx as u32, decrypt_charstring(encrypted_bytes, len_iv));
 
             let mut tok = self.next_token().unwrap();
             if tok == NP || tok == NP_ALT {

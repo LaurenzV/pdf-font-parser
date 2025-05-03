@@ -121,9 +121,9 @@ fn _parse_char_string(
                     return Err(CFFError::NestingLimitReached);
                 }
 
-                let index = p.stack.pop() as usize;
+                let index = p.stack.pop() as u32;
 
-                if let Some(subr) = ctx.params.subroutines.get(index) {
+                if let Some(subr) = ctx.params.subroutines.get(&index) {
                     _parse_char_string(ctx, subr, depth + 1, p)?;
                 } else {
                     return Err(CFFError::NoLocalSubroutines);
