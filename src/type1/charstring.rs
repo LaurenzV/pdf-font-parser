@@ -54,7 +54,7 @@ pub(crate) fn parse_char_string(
         y: 0.0,
     };
     _parse_char_string(&mut ctx, data, 0, &mut parser)?;
-    
+
     if !ctx.has_endchar {
         return Err(CFFError::MissingEndChar);
     }
@@ -228,7 +228,7 @@ fn _parse_char_string(
 
                 p.x = p.stack.at(0);
                 p.y = 0.0;
-                
+
                 println!("set to {}", p.x);
 
                 p.stack.clear();
@@ -268,9 +268,7 @@ fn _parse_char_string(
             251..=254 => {
                 p.parse_int3(op, &mut s)?;
             }
-            255 => {
-                p.parse_int4(&mut s)?
-            }
+            255 => p.parse_int4(&mut s)?,
             _ => {
                 warn!("unrecognized charstring op: {}", op);
             }

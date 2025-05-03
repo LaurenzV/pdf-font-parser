@@ -75,7 +75,7 @@ impl<'a> Table<'a> {
                         sy: matrix[3],
                         tx: matrix[4],
                         ty: matrix[5],
-                    }
+                    };
                 }
                 b"/Encoding" => params.encoding_type = s.read_encoding(),
                 b"eexec" => {
