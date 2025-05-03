@@ -210,13 +210,6 @@ impl<'a> Stream<'a> {
                 }
             }
 
-            let string_name = std::str::from_utf8(glyph_name).unwrap();
-
-            if string_name == "x" {
-                let a = 3;
-                println!("yes");
-            }
-
             let encrypted_bytes = self.read_bytes(bin_len as usize).unwrap();
             let decrypted_bytes = decrypt_charstring(encrypted_bytes, len_iv);
             charstrings.insert(
