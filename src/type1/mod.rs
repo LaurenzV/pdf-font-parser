@@ -186,7 +186,7 @@ impl<'a> Stream<'a> {
                 if glyph_name.starts_with(b"/") {
                     glyph_name = &glyph_name[1..];
                 }
-                
+
                 self.read_byte();
             } else {
                 let tok = self.next_token().unwrap();
@@ -211,19 +211,19 @@ impl<'a> Stream<'a> {
             }
 
             let string_name = std::str::from_utf8(glyph_name).unwrap();
-            
+
             if string_name == "x" {
                 let a = 3;
                 println!("yes");
             }
-            
+
             let encrypted_bytes = self.read_bytes(bin_len as usize).unwrap();
             let decrypted_bytes = decrypt_charstring(encrypted_bytes, len_iv);
             charstrings.insert(
                 std::str::from_utf8(glyph_name).unwrap().to_string(),
                 decrypted_bytes,
             );
-            
+
             let tok = self.next_token().unwrap();
             if tok == ND || tok == ND_ALT {
             } else {
@@ -272,7 +272,7 @@ impl<'a> Stream<'a> {
 
             if tok != RD && tok != RD_ALT {
                 panic!("invalid subroutine start token {:?}", tok);
-            }   else {
+            } else {
                 // WHitespace
                 self.read_byte();
             }
