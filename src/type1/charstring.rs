@@ -52,11 +52,9 @@ pub(crate) fn parse_char_string(
         builder: &mut inner_builder,
         x: 0.0,
         y: 0.0,
-        has_move_to: false,
-        is_first_move_to: true,
     };
     _parse_char_string(&mut ctx, data, 0, &mut parser)?;
-
+    
     if !ctx.has_endchar {
         return Err(CFFError::MissingEndChar);
     }
@@ -177,7 +175,7 @@ fn _parse_char_string(
                         let base_char_string = ctx
                             .params
                             .charstrings
-                            .get(&base_char.to_string())
+                            .get(&base_char.ok_or(CFFError::InvalidSeacCode)?.to_string())
                             .ok_or(CFFError::InvalidSeacCode)?;
                         _parse_char_string(ctx, base_char_string, depth + 1, p)?;
                         p.x = dx + sbx;
@@ -186,15 +184,9 @@ fn _parse_char_string(
                         let accent_char_string = ctx
                             .params
                             .charstrings
-                            .get(&accent_char.to_string())
+                            .get(&accent_char.ok_or(CFFError::InvalidSeacCode)?.to_string())
                             .ok_or(CFFError::InvalidSeacCode)?;
                         _parse_char_string(ctx, accent_char_string, depth + 1, p)?;
-
-                        if !p.is_first_move_to {
-                            p.is_first_move_to = true;
-                            p.builder.close();
-                        }
-
                         break;
                     }
                     tb_operator::SBW => {
@@ -241,12 +233,6 @@ fn _parse_char_string(
             }
             sb_operator::ENDCHAR => {
                 trace!("ENDCHAR");
-
-                if !p.is_first_move_to {
-                    p.is_first_move_to = true;
-                    p.builder.close();
-                }
-
                 ctx.has_endchar = true;
 
                 break;

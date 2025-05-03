@@ -15,9 +15,11 @@ use std::collections::HashMap;
 use std::iter::Copied;
 use std::slice::Iter;
 use std::str::FromStr;
+use std::sync::Arc;
 // Many parts of the parser code are adapted from
 // https://github.com/janpe2/CFFDump/blob/master/cff/type1/Type1Dump.java
 
+#[derive(Debug, Clone)]
 pub(crate) struct Parameters {
     font_matrix: Matrix,
     encoding_type: EncodingType,
@@ -36,6 +38,7 @@ impl Default for Parameters {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Table<'a> {
     data: &'a [u8],
     params: Parameters,
@@ -125,7 +128,7 @@ impl<'a> Table<'a> {
         Some(())
     }
 
-    pub fn code_to_string(&self, code_point: u8) -> &str {
+    pub fn code_to_string(&self, code_point: u8) -> Option<&str> {
         self.params.encoding_type.encode(code_point)
     }
 }
@@ -256,8 +259,6 @@ impl<'a> Stream<'a> {
             let subr_idx = self.next_int();
             let bin_len = self.next_int();
 
-            println!("{:?} {:?}", subr_idx, bin_len);
-
             let tok = self.next_token().unwrap();
 
             if tok != RD && tok != RD_ALT {
@@ -285,8 +286,6 @@ impl<'a> Stream<'a> {
             } else {
                 panic!("invalid subroutine end token {:?}", tok);
             }
-
-            println!("idx: {subr_idx}, len {bin_len}");
         }
 
         subroutines
@@ -415,7 +414,7 @@ impl<'a> Stream<'a> {
         }
 
         if !self.skip_until_before(b"dup", |b| matches!(b, b"def" | b"readonly")) {
-            return EncodingType::Custom(map);
+            return EncodingType::Custom(Arc::new(map));
         }
 
         while let Some(token) = self.next_token() {
@@ -440,7 +439,7 @@ impl<'a> Stream<'a> {
             map.insert(code, glyph_name);
         }
 
-        EncodingType::Custom(map)
+        EncodingType::Custom(Arc::new(map))
     }
 
     fn skip_dict(&mut self) {
@@ -539,17 +538,17 @@ fn is_self_delim_after_token(c: u8) -> bool {
     // here: /Pages 2 0 R>>. So the char '>' must end the token R.
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) enum EncodingType {
     Standard,
-    Custom(HashMap<u8, String>),
+    Custom(Arc<HashMap<u8, String>>),
 }
 
 impl EncodingType {
-    pub(crate) fn encode(&self, code: u8) -> &str {
+    pub(crate) fn encode(&self, code: u8) -> Option<&str> {
         match self {
-            EncodingType::Standard => STANDARD.get(&code).copied().unwrap_or("notdef"),
-            EncodingType::Custom(c) => c.get(&code).map(|s| s.as_str()).unwrap_or("notdef"),
+            EncodingType::Standard => STANDARD.get(&code).copied(),
+            EncodingType::Custom(c) => c.get(&code).map(|s| s.as_str()),
         }
     }
 }
