@@ -493,4 +493,16 @@ impl CharStringParser<'_> {
         self.stack.push(f32::from(n))?;
         Ok(())
     }
+
+    #[inline]
+    pub fn parse_int4(&mut self, s: &mut Stream) -> Result<(), CFFError> {
+        let b = s.read_bytes(4).ok_or(CFFError::ReadOutOfBounds)?;
+        let num = i32::from_be_bytes([b[0], b[1], b[2], b[3]]);
+        
+        // Make sure number is in-range.
+        debug_assert!((num as f32 as i32) == num);
+        
+        self.stack.push(num as f32)?;
+        Ok(())
+    }
 }

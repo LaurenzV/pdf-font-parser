@@ -228,6 +228,8 @@ fn _parse_char_string(
 
                 p.x = p.stack.at(0);
                 p.y = 0.0;
+                
+                println!("set to {}", p.x);
 
                 p.stack.clear();
             }
@@ -265,6 +267,9 @@ fn _parse_char_string(
             }
             251..=254 => {
                 p.parse_int3(op, &mut s)?;
+            }
+            255 => {
+                p.parse_int4(&mut s)?
             }
             _ => {
                 warn!("unrecognized charstring op: {}", op);
