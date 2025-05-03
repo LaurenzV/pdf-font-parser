@@ -160,3 +160,28 @@ impl<'a> Builder<'a> {
         self.builder.close();
     }
 }
+
+/// An affine transformation matrix.
+#[allow(missing_docs)]
+#[derive(Clone, Copy, Debug)]
+pub struct Matrix {
+    pub sx: f32,
+    pub ky: f32,
+    pub kx: f32,
+    pub sy: f32,
+    pub tx: f32,
+    pub ty: f32,
+}
+
+impl Default for Matrix {
+    fn default() -> Self {
+        Self {
+            sx: 0.001,
+            ky: 0.0,
+            kx: 0.0,
+            sy: 0.001,
+            tx: 0.0,
+            ty: 0.0,
+        }
+    }
+}

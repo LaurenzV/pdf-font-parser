@@ -12,7 +12,7 @@ use core::convert::TryFrom;
 use crate::{OutlineBuilder, RectF};
 use parser::{FromData, TryNumFrom};
 
-pub use cff::{Matrix, Table};
+pub use cff::Table;
 
 /// A list of errors that can occur during a CFF glyph outlining.
 #[allow(missing_docs)]

@@ -17,7 +17,7 @@ struct CharStringParserContext<'a> {
     has_seac: bool,
 }
 
-fn parse_char_string(
+pub(crate) fn parse_char_string(
     data: &[u8],
     params: &Parameters,
     builder: &mut dyn OutlineBuilder,
@@ -59,13 +59,6 @@ fn parse_char_string(
 
     if !ctx.has_endchar {
         return Err(CFFError::MissingEndChar);
-    }
-
-    let bbox = parser.builder.bbox;
-
-    // Check that bbox was changed.
-    if bbox.is_default() {
-        return Err(CFFError::ZeroBBox);
     }
 
     Ok(())

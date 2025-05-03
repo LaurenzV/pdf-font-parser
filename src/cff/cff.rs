@@ -19,7 +19,7 @@ use super::parser::{LazyArray16, NumFrom, Stream, TryNumFrom};
 use super::std_names::STANDARD_NAMES;
 use super::{calc_subroutine_bias, conv_subroutine_index, CFFError, IsEven, StringId};
 use crate::argstack::ArgumentsStack;
-use crate::{Builder, DummyOutline, GlyphId, OutlineBuilder, Rect, RectF};
+use crate::{Builder, DummyOutline, GlyphId, Matrix, OutlineBuilder, Rect, RectF};
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.
 const MAX_OPERANDS_LEN: usize = 48;
@@ -118,31 +118,6 @@ pub(crate) struct SIDMetadata<'a> {
 pub(crate) struct CIDMetadata<'a> {
     fd_array: Index<'a>,
     fd_select: FDSelect<'a>,
-}
-
-/// An affine transformation matrix.
-#[allow(missing_docs)]
-#[derive(Clone, Copy, Debug)]
-pub struct Matrix {
-    pub sx: f32,
-    pub ky: f32,
-    pub kx: f32,
-    pub sy: f32,
-    pub tx: f32,
-    pub ty: f32,
-}
-
-impl Default for Matrix {
-    fn default() -> Self {
-        Self {
-            sx: 0.001,
-            ky: 0.0,
-            kx: 0.0,
-            sy: 0.001,
-            tx: 0.0,
-            ty: 0.0,
-        }
-    }
 }
 
 #[derive(Default)]

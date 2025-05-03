@@ -5,9 +5,11 @@ mod operator;
 mod standard;
 pub(crate) mod stream;
 
+use crate::type1::charstring::parse_char_string;
 use crate::type1::decrypt::{decrypt, decrypt_byte};
 use crate::type1::standard::STANDARD;
 use crate::type1::stream::Stream;
+use crate::{Matrix, OutlineBuilder};
 use log::error;
 use std::collections::HashMap;
 use std::iter::Copied;
@@ -18,7 +20,7 @@ use std::str::FromStr;
 // https://github.com/janpe2/CFFDump/blob/master/cff/type1/Type1Dump.java
 
 pub(crate) struct Parameters {
-    font_matrix: Option<[f32; 6]>,
+    font_matrix: Matrix,
     encoding_type: EncodingType,
     subroutines: Vec<Vec<u8>>,
     charstrings: HashMap<String, Vec<u8>>,
@@ -27,7 +29,7 @@ pub(crate) struct Parameters {
 impl Default for Parameters {
     fn default() -> Self {
         Self {
-            font_matrix: None,
+            font_matrix: Matrix::default(),
             encoding_type: EncodingType::Standard,
             subroutines: vec![],
             charstrings: HashMap::new(),
@@ -37,6 +39,7 @@ impl Default for Parameters {
 
 pub struct Table<'a> {
     data: &'a [u8],
+    params: Parameters,
 }
 
 impl<'a> Table<'a> {
@@ -61,7 +64,17 @@ impl<'a> Table<'a> {
                 b"/UniqueID" => s.skip_token(),
                 b"/Metrics" => s.skip_dict(),
                 b"/StrokeWidth" => s.skip_token(),
-                b"/FontMatrix" => params.font_matrix = Some(s.read_font_matrix()),
+                b"/FontMatrix" => {
+                    let matrix = s.read_font_matrix();
+                    params.font_matrix = Matrix {
+                        sx: matrix[0],
+                        kx: matrix[1],
+                        ky: matrix[2],
+                        sy: matrix[3],
+                        tx: matrix[4],
+                        ty: matrix[5],
+                    }
+                }
                 b"/Encoding" => params.encoding_type = s.read_encoding(),
                 b"eexec" => {
                     let decrypted = decrypt(s.tail().unwrap());
@@ -74,7 +87,7 @@ impl<'a> Table<'a> {
             }
         }
 
-        Some(Self { data })
+        Some(Self { data, params })
     }
 
     fn parse_eexec(data: &[u8], params: &mut Parameters) {
@@ -96,6 +109,25 @@ impl<'a> Table<'a> {
                 _ => {}
             }
         }
+    }
+
+    /// Returns a font transformation matrix.
+    #[inline]
+    pub fn matrix(&self) -> Matrix {
+        self.params.font_matrix
+    }
+
+    /// Outlines a glyph.
+    pub fn outline(&self, string: &str, builder: &mut dyn OutlineBuilder) -> Option<()> {
+        let data = self.params.charstrings.get(string)?;
+
+        parse_char_string(data, &self.params, builder).unwrap();
+
+        Some(())
+    }
+
+    pub fn code_to_string(&self, code_point: u8) -> &str {
+        self.params.encoding_type.encode(code_point)
     }
 }
 
@@ -481,8 +513,6 @@ fn decrypt_charstring(data: &[u8], len_iv: usize) -> Vec<u8> {
     for byte in cb {
         decrypted.push(decrypt_byte(byte, &mut r))
     }
-
-    println!("decrypted: {:?}", decrypted);
 
     decrypted
 }
