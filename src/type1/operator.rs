@@ -1,4 +1,4 @@
-mod single_byte_operator {
+pub(crate) mod sb_operator {
     pub const HORIZONTAL_STEM: u8 = 1;
     pub const VERTICAL_STEM: u8 = 3;
     pub const VERTICAL_MOVE_TO: u8 = 4;
@@ -18,7 +18,7 @@ mod single_byte_operator {
     pub const HV_CURVE_TO: u8 = 31;
 }
 
-mod two_byte_operator {
+pub(crate) mod tb_operator {
     pub const DOTSECTION: u8 = 0;
     pub const VSTEM3: u8 = 1;
     pub const HSTEM3: u8 = 2;

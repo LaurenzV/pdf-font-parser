@@ -10,7 +10,6 @@ use core::convert::TryFrom;
 use core::num::NonZeroU16;
 use core::ops::Range;
 
-use super::argstack::ArgumentsStack;
 use super::charset::{parse_charset, Charset};
 use super::charstring::CharStringParser;
 use super::dict::DictionaryParser;
@@ -19,6 +18,7 @@ use super::index::{parse_index, skip_index, Index};
 use super::parser::{LazyArray16, NumFrom, Stream, TryNumFrom};
 use super::std_names::STANDARD_NAMES;
 use super::{calc_subroutine_bias, conv_subroutine_index, CFFError, IsEven, StringId};
+use crate::argstack::ArgumentsStack;
 use crate::{Builder, DummyOutline, GlyphId, OutlineBuilder, Rect, RectF};
 
 // Limits according to the Adobe Technical Note #5176, chapter 4 DICT Data.

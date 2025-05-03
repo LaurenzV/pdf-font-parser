@@ -1,4 +1,3 @@
-pub(crate) mod argstack;
 pub mod cff;
 mod charset;
 pub(crate) mod charstring;

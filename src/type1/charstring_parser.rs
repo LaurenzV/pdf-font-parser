@@ -1,24 +1,24 @@
-use super::parser::{Fixed, Stream};
-use super::{f32_abs, CFFError, IsEven};
 use crate::argstack::ArgumentsStack;
+use crate::cff::{f32_abs, CFFError, IsEven};
+use crate::type1::stream::Stream;
 use crate::Builder;
 
 pub(crate) struct CharStringParser<'a> {
     pub stack: ArgumentsStack<'a>,
+    pub ps_stack: ArgumentsStack<'a>,
     pub builder: &'a mut Builder<'a>,
     pub x: f32,
     pub y: f32,
     pub has_move_to: bool,
     pub is_first_move_to: bool,
-    pub width_only: bool, // Exit right after the glyph width is parsed.
 }
 
 impl CharStringParser<'_> {
     #[inline]
-    pub fn parse_move_to(&mut self, offset: usize) -> Result<(), CFFError> {
+    pub fn parse_move_to(&mut self) -> Result<(), CFFError> {
         // dx1 dy1
 
-        if self.stack.len() != offset + 2 {
+        if self.stack.len() != 2 {
             return Err(CFFError::InvalidArgumentsStackLength);
         }
 
@@ -30,8 +30,8 @@ impl CharStringParser<'_> {
 
         self.has_move_to = true;
 
-        self.x += self.stack.at(offset + 0);
-        self.y += self.stack.at(offset + 1);
+        self.x += self.stack.at(0);
+        self.y += self.stack.at(1);
         self.builder.move_to(self.x, self.y);
 
         self.stack.clear();
@@ -39,10 +39,8 @@ impl CharStringParser<'_> {
     }
 
     #[inline]
-    pub fn parse_horizontal_move_to(&mut self, offset: usize) -> Result<(), CFFError> {
-        // dx1
-
-        if self.stack.len() != offset + 1 {
+    pub fn parse_horizontal_move_to(&mut self) -> Result<(), CFFError> {
+        if self.stack.len() != 1 {
             return Err(CFFError::InvalidArgumentsStackLength);
         }
 
@@ -54,7 +52,7 @@ impl CharStringParser<'_> {
 
         self.has_move_to = true;
 
-        self.x += self.stack.at(offset);
+        self.x += self.stack.at(0);
         self.builder.move_to(self.x, self.y);
 
         self.stack.clear();
@@ -62,10 +60,8 @@ impl CharStringParser<'_> {
     }
 
     #[inline]
-    pub fn parse_vertical_move_to(&mut self, offset: usize) -> Result<(), CFFError> {
-        // dy1
-
-        if self.stack.len() != offset + 1 {
+    pub fn parse_vertical_move_to(&mut self) -> Result<(), CFFError> {
+        if self.stack.len() != 1 {
             return Err(CFFError::InvalidArgumentsStackLength);
         }
 
@@ -77,7 +73,7 @@ impl CharStringParser<'_> {
 
         self.has_move_to = true;
 
-        self.y += self.stack.at(offset);
+        self.y += self.stack.at(0);
         self.builder.move_to(self.x, self.y);
 
         self.stack.clear();
@@ -402,9 +398,6 @@ impl CharStringParser<'_> {
 
     #[inline]
     pub fn parse_vh_curve_to(&mut self) -> Result<(), CFFError> {
-        // dy1 dx2 dy2 dx3 {dxa dxb dyb dyc dyd dxe dye dxf}* dyf?
-        //                 {dya dxb dyb dxc dxd dxe dye dyf}+ dxf?
-
         if !self.has_move_to {
             return Err(CFFError::MissingMoveTo);
         }
@@ -581,6 +574,13 @@ impl CharStringParser<'_> {
     }
 
     #[inline]
+    pub fn parse_close_path(&mut self) -> Result<(), CFFError> {
+        self.builder.close();
+
+        Ok(())
+    }
+
+    #[inline]
     pub fn parse_int1(&mut self, op: u8) -> Result<(), CFFError> {
         let n = i16::from(op) - 139;
         self.stack.push(f32::from(n))?;
@@ -589,7 +589,7 @@ impl CharStringParser<'_> {
 
     #[inline]
     pub fn parse_int2(&mut self, op: u8, s: &mut Stream) -> Result<(), CFFError> {
-        let b1 = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)?;
+        let b1 = s.read_byte().ok_or(CFFError::ReadOutOfBounds)?;
         let n = (i16::from(op) - 247) * 256 + i16::from(b1) + 108;
         debug_assert!((108..=1131).contains(&n));
         self.stack.push(f32::from(n))?;
@@ -598,17 +598,10 @@ impl CharStringParser<'_> {
 
     #[inline]
     pub fn parse_int3(&mut self, op: u8, s: &mut Stream) -> Result<(), CFFError> {
-        let b1 = s.read::<u8>().ok_or(CFFError::ReadOutOfBounds)?;
+        let b1 = s.read_byte().ok_or(CFFError::ReadOutOfBounds)?;
         let n = -(i16::from(op) - 251) * 256 - i16::from(b1) - 108;
         debug_assert!((-1131..=-108).contains(&n));
         self.stack.push(f32::from(n))?;
-        Ok(())
-    }
-
-    #[inline]
-    pub fn parse_fixed(&mut self, s: &mut Stream) -> Result<(), CFFError> {
-        let n = s.read::<Fixed>().ok_or(CFFError::ReadOutOfBounds)?;
-        self.stack.push(n.0)?;
         Ok(())
     }
 }

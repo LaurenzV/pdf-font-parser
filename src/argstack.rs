@@ -1,4 +1,4 @@
-use super::CFFError;
+use crate::cff::CFFError;
 
 pub struct ArgumentsStack<'a> {
     pub data: &'a mut [f32],

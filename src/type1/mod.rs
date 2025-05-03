@@ -1,8 +1,9 @@
 mod charstring;
+mod charstring_parser;
 mod decrypt;
 mod operator;
 mod standard;
-mod stream;
+pub(crate) mod stream;
 
 use crate::type1::decrypt::{decrypt, decrypt_byte};
 use crate::type1::standard::STANDARD;
@@ -20,7 +21,7 @@ pub(crate) struct Parameters {
     font_matrix: Option<[f32; 6]>,
     encoding_type: EncodingType,
     subroutines: Vec<Vec<u8>>,
-    charstrings: Vec<Vec<u8>>,
+    charstrings: HashMap<String, Vec<u8>>,
 }
 
 impl Default for Parameters {
@@ -29,7 +30,7 @@ impl Default for Parameters {
             font_matrix: None,
             encoding_type: EncodingType::Standard,
             subroutines: vec![],
-            charstrings: vec![],
+            charstrings: HashMap::new(),
         }
     }
 }
@@ -112,8 +113,8 @@ impl<'a> Stream<'a> {
         i32::from_str(std::str::from_utf8(self.next_token().unwrap()).unwrap()).unwrap()
     }
 
-    fn parse_charstrings(&mut self, len_iv: usize) -> Option<Vec<Vec<u8>>> {
-        let mut charstrings = vec![];
+    fn parse_charstrings(&mut self, len_iv: usize) -> Option<HashMap<String, Vec<u8>>> {
+        let mut charstrings = HashMap::new();
 
         let mut first_glyph_name = None;
         let mut int_token = None;
@@ -159,6 +160,8 @@ impl<'a> Stream<'a> {
 
                 if tok.starts_with(b"/") {
                     glyph_name = &tok[1..];
+                } else {
+                    glyph_name = tok;
                 }
 
                 bin_len = self.next_int();
@@ -172,9 +175,11 @@ impl<'a> Stream<'a> {
 
             self.skip_whitespaces();
 
-            // TODO: Decrypt
             let encrypted_bytes = self.read_bytes(bin_len as usize).unwrap();
-            charstrings.push(decrypt_charstring(encrypted_bytes, len_iv));
+            charstrings.insert(
+                std::str::from_utf8(glyph_name).unwrap().to_string(),
+                decrypt_charstring(encrypted_bytes, len_iv),
+            );
 
             let tok = self.next_token().unwrap();
             if tok == ND || tok == ND_ALT {
