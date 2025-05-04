@@ -975,6 +975,17 @@ impl<'a> Table<'a> {
         }
     }
 
+    pub fn glyph_index_by_cid(&self, cid: u16) -> Option<GlyphId> {
+        match self.kind {
+            FontKind::SID(_) => None,
+            FontKind::CID(_) => self.charset.sid_to_gid(StringId(cid)),
+        }
+    }
+
+    pub fn is_cid(&self) -> bool {
+        matches!(self.kind, FontKind::CID(_))
+    }
+
     /// Returns a glyph ID by a name.
     pub fn glyph_index_by_name(&self, name: &str) -> Option<GlyphId> {
         match self.kind {

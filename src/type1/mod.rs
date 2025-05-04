@@ -89,7 +89,10 @@ impl<'a> Table<'a> {
             }
         }
 
-        Some(Self { data, params: Arc::new(params) })
+        Some(Self {
+            data,
+            params: Arc::new(params),
+        })
     }
 
     fn parse_eexec(data: &[u8], params: &mut Parameters) {
